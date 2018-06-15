@@ -17,9 +17,9 @@ class TestError(unittest.TestCase):
 
         # First with no error
         errcode = yices_error_code()
-        self.assertEqual(errcode, 0L)
+        self.assertEqual(errcode, 0)
         errep = yices_error_report()
-        self.assertEqual(errep.code, 0L)
+        self.assertEqual(errep.code, 0)
         yices_clear_error()
         errstr = yices_error_string()
         self.assertEqual(errstr, 'no error')
@@ -37,4 +37,4 @@ class TestError(unittest.TestCase):
         self.assertEqual(errstr, 'no error')
         yices_print_error_fd(1)
         yices_clear_error()
-        self.assertEqual(yices_error_code(), 0L)
+        self.assertEqual(yices_error_code(), 0)
