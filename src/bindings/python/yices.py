@@ -136,7 +136,7 @@ def catch_error(errval):
             result = yices_fun(*args, **kwargs) if __yices_library_inited__ else None
             if not  __yices_library_inited__ :
                 raise YicesException(errstr)
-            if result == errval and yices_error_code() != 0L:
+            if result == errval and yices_error_code() != 0:
                 errstr = yices_error_string()
                 yices_clear_error()
                 raise YicesException(errstr)
@@ -249,7 +249,7 @@ def yices_has_mcsat():
 def checkYices():
     """Checks that the library is not too stale to work with these bindings."""
     def _versionCheck():
-        (lv_major, lv_minor, lv_revision) = [ int(x) for x in yices_version.split('.') ]
+        (lv_major, lv_minor, lv_revision) = [ int(x) for x in yices_version.split(b'.') ]
         (rv_major, rv_minor, rv_revision) = [ int(x) for x in yices_recommended_version.split('.') ]
         if lv_major < rv_major:
             return False
@@ -4269,7 +4269,7 @@ libyices.yices_context_status.restype = smt_status_t
 libyices.yices_context_status.argtypes = [context_t]
 @catch_error(-1)
 def yices_context_status(ctx):
-    """The context status: a number (starting with 0L) representing one of
+    """The context status: a number (starting with 0) representing one of
     STATUS_IDLE, STATUS_SEARCHING, STATUS_UNKNOWN,
     STATUS_SAT, STATUS_UNSAT, STATUS_INTERRUPTED, STATUS_ERROR
     """
