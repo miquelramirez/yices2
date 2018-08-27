@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 if eval 'uname > /dev/null 2> /dev/null'; then
   case `uname -s` in
     Linux*)
