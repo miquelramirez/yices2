@@ -897,7 +897,6 @@ void context_build_model(model_t *model, context_t *ctx) {
 
 
 
-
 /*
  * Read the value of a Boolean term t
  * - return VAL_TRUE/VAL_FALSE or VAL_UNDEF_FALSE/VAL_UNDEF_TRUE if t's value is not known
@@ -941,13 +940,28 @@ bval_t context_bool_term_value(context_t *ctx, term_t t) {
 
 
 /*
+ * UNSAT CORE
+ */
+
+/*
  * Build an unsat core:
  * - store the result in v
+ * - if there are no assumptions, return an empty core
  */
 void context_build_unsat_core(context_t *ctx, ivector_t *v) {
   smt_core_t *core;
+  uint32_t i, n;
+  term_t t;
 
   core = ctx->core;
   assert(core != NULL && core->status == STATUS_UNSAT);
   build_unsat_core(core, v);
+
+  // convert from literals to terms
+  n = v->size;
+  for (i=0; i<n; i++) {
+    t = assumption_term_for_literal(&ctx->assumptions, v->data[i]);
+    assert(t >= 0);
+    v->data[i] = t;
+  }
 }

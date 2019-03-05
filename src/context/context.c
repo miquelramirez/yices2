@@ -1453,6 +1453,7 @@ static thvar_t map_idiv_to_arith(context_t *ctx, composite_term_t *div) {
   } else {
     // division by a non-constant or by zero: not supported by default
     // arithmetic solver for now
+    q_clear(&k);
     longjmp(ctx->env, FORMULA_NOT_LINEAR);
   }
   q_clear(&k);
@@ -1491,6 +1492,7 @@ static thvar_t map_mod_to_arith(context_t *ctx, composite_term_t *mod) {
 
   } else {
     // Non-constant or zero divider
+    q_clear(&k);
     longjmp(ctx->env, FORMULA_NOT_LINEAR);
   }
 
@@ -5349,6 +5351,7 @@ void init_context(context_t *ctx, term_table_t *terms, smt_logic_t logic,
   init_istack(&ctx->istack);
   init_sharing_map(&ctx->sharing, &ctx->intern);
   init_objstore(&ctx->cstore, sizeof(conditional_t), 32);
+  init_assumption_stack(&ctx->assumptions);
 
   ctx->subst = NULL;
   ctx->marks = NULL;
@@ -5439,6 +5442,7 @@ void delete_context(context_t *ctx) {
   delete_istack(&ctx->istack);
   delete_sharing_map(&ctx->sharing);
   delete_objstore(&ctx->cstore);
+  delete_assumption_stack(&ctx->assumptions);
 
   context_free_subst(ctx);
   context_free_marks(ctx);
@@ -5490,6 +5494,7 @@ void reset_context(context_t *ctx) {
   reset_istack(&ctx->istack);
   reset_sharing_map(&ctx->sharing);
   reset_objstore(&ctx->cstore);
+  reset_assumption_stack(&ctx->assumptions);
 
   context_free_subst(ctx);
   context_free_marks(ctx);
@@ -5531,6 +5536,7 @@ void context_push(context_t *ctx) {
   }
   gate_manager_push(&ctx->gate_manager);
   intern_tbl_push(&ctx->intern);
+  assumption_stack_push(&ctx->assumptions);
   context_eq_cache_push(ctx);
   context_divmod_table_push(ctx);
 
@@ -5545,6 +5551,7 @@ void context_pop(context_t *ctx) {
   }
   gate_manager_pop(&ctx->gate_manager);
   intern_tbl_pop(&ctx->intern);
+  assumption_stack_pop(&ctx->assumptions);
   context_eq_cache_pop(ctx);
   context_divmod_table_pop(ctx);
 
@@ -5877,6 +5884,8 @@ int32_t context_internalize(context_t *ctx, term_t t) {
 
   code = setjmp(ctx->env);
   if (code == 0) {
+    // we must call internalization start first
+    internalization_start(ctx->core);
     l = internalize_to_literal(ctx, t);
   } else {
     assert(code < 0);
@@ -5906,11 +5915,17 @@ int32_t context_internalize(context_t *ctx, term_t t) {
 int32_t context_add_assumption(context_t *ctx, term_t t) {
   int32_t l, x;
 
-  l = context_internalize(ctx, t);
-  if (l < 0) return l; // error code
+  // check if we already have an assumption literal for t
+  x = assumption_literal_for_term(&ctx->assumptions, t);
+  if (x < 0) {
+    l = context_internalize(ctx, t);
+    if (l < 0) return l; // error code
 
-  x = pos_lit(create_boolean_variable(ctx->core));
-  add_binary_clause(ctx->core, not(x), l); // clause (x implies l)
+    x = pos_lit(create_boolean_variable(ctx->core));
+    add_binary_clause(ctx->core, not(x), l); // clause (x implies l)
+
+    assumption_stack_add(&ctx->assumptions, t, x);
+  }
 
   return x;
 }
@@ -6113,6 +6128,8 @@ void context_clear(context_t *ctx) {
 
 /*
  * Clear_unsat: prepare for pop if the status is UNSAT
+ * - remove assumptions if any
+ *
  * - if clean interrupt is enabled, then there may be a mismatch between
  *   the context's base_level and the core base_level.
  * - it's possible to have ctx->core.base_level = ctx->base_level + 1
